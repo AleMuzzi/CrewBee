@@ -18,7 +18,8 @@
   },
   "exports": {
     ".": "./dist/opencode-plugin.mjs",
-    "./server": "./dist/opencode-plugin.mjs"
+    "./server": "./dist/opencode-plugin.mjs",
+    "./tui": "./dist/opencode-tui.mjs"
   },
   "files": [
     "dist",
@@ -27,7 +28,7 @@
     "opencode-plugin.mjs"
   ],
   "scripts": {
-    "build": "npm run clean && tsc -p tsconfig.json && npm run build:opencode-plugin",
+    "build": "npm run clean && tsc -p tsconfig.json && npm run build:opencode-plugin && npm run build:tui",
     "build:opencode-plugin": "node ./scripts/build-opencode-plugin.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
@@ -47,14 +48,19 @@
     "uninstall:user": "node ./bin/crewbee.js uninstall:user",
     "doctor": "node ./bin/crewbee.js doctor",
     "version": "node ./bin/crewbee.js version",
-    "test": "npm run build && node --test tests/**/*.test.mjs"
+    "test": "npm run build && node --test tests/**/*.test.mjs",
+    "build:tui": "node ./scripts/build-opencode-tui.mjs"
   },
   "devDependencies": {
     "@opencode-ai/plugin": "1.15.10",
     "@opencode/plugin": "2.1.3",
     "@types/node": "^25.3.5",
     "esbuild": "^0.25.9",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "solid-js": "^1.9.0",
+    "@opentui/core": "0.7.0",
+    "@opentui/solid": "0.7.0",
+    "esbuild-plugin-solid": "^0.6.0"
   },
   "dependencies": {
     "yaml": "^2.8.2",
