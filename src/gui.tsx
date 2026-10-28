@@ -68,7 +68,7 @@ export default Plugin.define({
 function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
   const background = () => props.session.background ?? []
 
-  const [agents, { refetch: refetchAgents }] = createResource(async () => {
+  const [agents] = createResource(async () => {
     try {
       const res = await props.ctx.client.agent.list()
       const list = res?.data ?? res ?? []
@@ -139,6 +139,7 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
   }
 
   const onAgentModelChange = async (agentId: string, modelId: string) => {
+    if (!modelId) return
     const m = (models() ?? []).find((x: any) => (x.id ?? x.modelID) === modelId)
     if (!m) return
     try {
@@ -156,8 +157,13 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
     const m = a.model
     if (m && (m.id || m.modelID)) return (m.providerID ? m.providerID + "/" : "") + (m.id ?? m.modelID)
     const dm = defaultModel()
-    if (dm) return "host default (" + (dm.id ?? dm.modelID ?? "?") + ")"
+    if (dm) return "host default → " + (dm.id ?? dm.modelID ?? "?")
     return "host default"
+  }
+
+  const dmLabel = () => {
+    const dm = defaultModel()
+    return dm ? (dm.id ?? dm.modelID ?? "?") : "default"
   }
 
   return (
@@ -180,6 +186,11 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
       <hr style={{ opacity: 0.3 }} />
 
       <h4>{"Agenti CrewBee (" + (agents()?.length ?? 0) + ")"}</h4>
+      <p style={{ "font-size": "11px", opacity: 0.6, margin: 0 }}>
+        {"Modello effettivo: " + ((agents()?.length ?? 0) > 0
+          ? "host default (" + dmLabel() + ") se non configurato, altrimenti quello in crewbee.json"
+          : "nessun agente")}
+      </p>
       <For each={agents() ?? []}>
         {(a: any) => (
           <div style={{ "padding-left": "8px", display: "flex", "flex-direction": "column", gap: "4px", "margin-bottom": "8px" }}>
@@ -191,7 +202,7 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
               style={{ "font-size": "11px", "max-width": "100%" }}
               onChange={(e) => onAgentModelChange(a.id ?? a.name, e.currentTarget.value)}
             >
-              <option value="">{agentModelLabel(a)}</option>
+              <option value="">{agentModelLabel(a) + " (attuale)"}</option>
               <For each={models() ?? []}>
                 {(m: any) => (
                   <option value={m.id ?? m.modelID}>
@@ -208,7 +219,7 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
 
       <h4>{"Modello sessione corrente"}</h4>
       <div style={{ "font-size": "12px", opacity: 0.7, "margin-bottom": "4px" }}>
-        {"In uso: " + (currentModelId() || "default")}
+        {"In uso: " + (currentModelId() || "host default (" + dmLabel() + ")")}
       </div>
       <select
         value={currentModelId()}
