@@ -64,15 +64,28 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
     }
   })
 
-  const [currentModel, setCurrentModel] = createResource(async () => {
+  const [defaultModel] = createResource(async () => {
     try {
-      const s = await props.ctx.client.session.get({ path: { id: props.session.id } })
-      const info = s?.data ?? s
-      return info?.model ?? null
+      const res = await props.ctx.client.model.default()
+      return res?.data ?? res ?? null
     } catch (e) {
       return null
     }
   })
+
+  const [sessionInfo, setSessionInfo] = createResource(async () => {
+    try {
+      const res = await props.ctx.client.session.get({ path: { id: props.session.id } })
+      return res?.data ?? res ?? null
+    } catch (e) {
+      return null
+    }
+  })
+
+  const currentModelId = () => {
+    const m = sessionInfo()?.model
+    return m?.id ?? m?.modelID ?? ""
+  }
 
   const onModelChange = async (modelId: string) => {
     const m = (models() ?? []).find((x: any) => (x.id ?? x.modelID) === modelId)
@@ -82,13 +95,24 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
         path: { id: props.session.id },
         body: { model: { providerID: m.providerID, id: m.id ?? m.modelID } },
       })
+      // refresh session info
+      const res = await props.ctx.client.session.get({ path: { id: props.session.id } })
+      setSessionInfo(res?.data ?? res ?? null)
     } catch (e) {
       // ignore
     }
   }
 
+  const agentModelLabel = (a: any) => {
+    const m = a.model
+    if (m && (m.id || m.modelID)) return (m.providerID ? m.providerID + "/" : "") + (m.id ?? m.modelID)
+    const dm = defaultModel()
+    if (dm) return "host default (" + (dm.id ?? dm.modelID ?? "?") + ")"
+    return "host default"
+  }
+
   return (
-    <div style={{ padding: "8px", display: "flex", "flex-direction": "column", gap: "8px" }}>
+    <div style={{ padding: "8px", display: "flex", "flex-direction": "column", gap: "8px", "max-height": "100%", "overflow-y": "auto" }}>
       <h3>{"CrewBee — agenti al lavoro"}</h3>
 
       <Show when={background().length === 0}>
@@ -112,7 +136,7 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
           <div style={{ "padding-left": "8px", display: "flex", "flex-direction": "column", gap: "2px" }}>
             <strong>{a.id ?? a.name}</strong>
             <span style={{ "font-size": "12px", opacity: 0.7 }}>
-              {"model: " + (a.model?.modelID ?? a.model?.id ?? a.model ?? "default")}
+              {"model: " + agentModelLabel(a)}
             </span>
           </div>
         )}
@@ -121,11 +145,17 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
       <hr style={{ opacity: 0.3 }} />
 
       <h4>{"Modello sessione corrente"}</h4>
+      <div style={{ "font-size": "12px", opacity: 0.7, "margin-bottom": "4px" }}>
+        {"In uso: " + (currentModelId() || "default")}
+      </div>
       <select
-        value={currentModel()?.id ?? currentModel()?.modelID ?? ""}
+        value={currentModelId()}
         onChange={(e) => onModelChange(e.currentTarget.value)}
         style={{ "font-size": "12px" }}
       >
+        <Show when={currentModelId() && !(models() ?? []).some((m: any) => (m.id ?? m.modelID) === currentModelId())}>
+          <option value={currentModelId()}>{currentModelId()}</option>
+        </Show>
         <For each={models() ?? []}>
           {(m: any) => (
             <option value={m.id ?? m.modelID}>
