@@ -1,6 +1,18 @@
 import { Plugin } from "@opencode/plugin/gui"
 import { For, Show, createMemo, createResource } from "solid-js"
 import { Command, Panel } from "@opencode/plugin/gui"
+import { Schema } from "effect"
+import { Ipc } from "@opencode/plugin/gui"
+
+const CrewBeeConfig = Ipc.define({
+  id: "crewbee",
+  methods: {
+    setAgentModel: {
+      input: Schema.Struct({ agentId: Schema.String, providerID: Schema.String, modelID: Schema.String }),
+      output: Schema.Struct({ ok: Schema.Boolean }),
+    },
+  },
+})
 
 export default Plugin.define({
   setup(ctx) {
@@ -27,12 +39,36 @@ export default Plugin.define({
       render: (props) => <CrewBeeActivityPanel ctx={ctx} session={props.session} />,
     })
   },
+  main(ctx) {
+    ctx.provide(CrewBeeConfig, {
+      setAgentModel: async (input) => {
+        try {
+          const fs = await import("node:fs")
+          const path = await import("node:path")
+          const os = await import("node:os")
+          const configPath = path.join(os.homedir(), ".config", "opencode", "opencode.json")
+          let config: any = {}
+          if (fs.existsSync(configPath)) {
+            config = JSON.parse(fs.readFileSync(configPath, "utf8"))
+          }
+          if (!config.agent) config.agent = {}
+          if (!config.agent[input.agentId]) config.agent[input.agentId] = {}
+          config.agent[input.agentId].model = input.providerID + "/" + input.modelID
+          fs.mkdirSync(path.dirname(configPath), { recursive: true })
+          fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf8")
+          return { ok: true }
+        } catch (e) {
+          return { ok: false }
+        }
+      },
+    })
+  },
 })
 
 function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
   const background = () => props.session.background ?? []
 
-  const [agents] = createResource(async () => {
+  const [agents, { refetch: refetchAgents }] = createResource(async () => {
     try {
       const res = await props.ctx.client.agent.list()
       const list = res?.data ?? res ?? []
@@ -84,10 +120,10 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
 
   const currentModelId = () => {
     const m = sessionInfo()?.model
-    return m?.id ?? m?.modelID ?? ""
+    return m?.id ?? ""
   }
 
-  const onModelChange = async (modelId: string) => {
+  const onSessionModelChange = async (modelId: string) => {
     const m = (models() ?? []).find((x: any) => (x.id ?? x.modelID) === modelId)
     if (!m) return
     try {
@@ -95,9 +131,22 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
         path: { id: props.session.id },
         body: { model: { providerID: m.providerID, id: m.id ?? m.modelID } },
       })
-      // refresh session info
       const res = await props.ctx.client.session.get({ path: { id: props.session.id } })
       setSessionInfo(res?.data ?? res ?? null)
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  const onAgentModelChange = async (agentId: string, modelId: string) => {
+    const m = (models() ?? []).find((x: any) => (x.id ?? x.modelID) === modelId)
+    if (!m) return
+    try {
+      await props.ctx.main(CrewBeeConfig).setAgentModel({
+        agentId,
+        providerID: m.providerID,
+        modelID: m.id ?? m.modelID,
+      })
     } catch (e) {
       // ignore
     }
@@ -133,11 +182,24 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
       <h4>{"Agenti CrewBee (" + (agents()?.length ?? 0) + ")"}</h4>
       <For each={agents() ?? []}>
         {(a: any) => (
-          <div style={{ "padding-left": "8px", display: "flex", "flex-direction": "column", gap: "2px" }}>
+          <div style={{ "padding-left": "8px", display: "flex", "flex-direction": "column", gap: "4px", "margin-bottom": "8px" }}>
             <strong>{a.id ?? a.name}</strong>
             <span style={{ "font-size": "12px", opacity: 0.7 }}>
               {"model: " + agentModelLabel(a)}
             </span>
+            <select
+              style={{ "font-size": "11px", "max-width": "100%" }}
+              onChange={(e) => onAgentModelChange(a.id ?? a.name, e.currentTarget.value)}
+            >
+              <option value="">{agentModelLabel(a)}</option>
+              <For each={models() ?? []}>
+                {(m: any) => (
+                  <option value={m.id ?? m.modelID}>
+                    {(m.providerID ?? "") + "/" + (m.id ?? m.modelID)}
+                  </option>
+                )}
+              </For>
+            </select>
           </div>
         )}
       </For>
@@ -150,7 +212,7 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
       </div>
       <select
         value={currentModelId()}
-        onChange={(e) => onModelChange(e.currentTarget.value)}
+        onChange={(e) => onSessionModelChange(e.currentTarget.value)}
         style={{ "font-size": "12px" }}
       >
         <Show when={currentModelId() && !(models() ?? []).some((m: any) => (m.id ?? m.modelID) === currentModelId())}>
@@ -177,7 +239,7 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
       </For>
 
       <p style={{ "font-size": "11px", opacity: 0.5 }}>
-        Il modello predefinito per agente si configura in crewbee.json (campo model) o opencode.json (agent.&lt;id&gt;.model).
+        Cambiare il modello per agente aggiorna opencode.json (agent.&lt;id&gt;.model). Riavvia OpenCode per applicare.
       </p>
     </div>
   )
