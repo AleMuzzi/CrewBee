@@ -1,5 +1,4 @@
 {
-  "name": "crewbee",
   "version": "0.1.24",
   "description": "A Team-first Agent System",
   "license": "MIT",
@@ -16,18 +15,14 @@
   "bin": {
     "crewbee": "bin/crewbee.js"
   },
-  "exports": {
-    ".": "./dist/opencode-plugin.mjs",
-    "./server": "./dist/opencode-plugin.mjs",
-    "./tui": "./dist/opencode-tui.mjs",
-    "./gui": "./dist/gui-experimental.cjs",
-    "./gui-experimental": "./dist/gui-experimental.cjs"
-  },
   "files": [
     "dist",
     "bin",
     "templates",
-    "opencode-plugin.mjs"
+    "opencode-plugin.mjs",
+    "server.js",
+    "tui.js",
+    "gui-experimental.cjs"
   ],
   "scripts": {
     "build": "npm run clean && tsc -p tsconfig.json && npm run build:opencode-plugin && npm run build:tui && npm run build:gui",
@@ -70,5 +65,13 @@
   "dependencies": {
     "yaml": "^2.8.2",
     "zod": "^4.1.8"
+  },
+  "name": "crewbee",
+  "exports": {
+    ".": "./dist/opencode-plugin.mjs",
+    "./server": "./dist/opencode-plugin.mjs",
+    "./tui": "./dist/opencode-tui.mjs",
+    "./gui": "./dist/gui-experimental.cjs",
+    "./gui-experimental": "./dist/gui-experimental.cjs"
   }
 }
