@@ -30,6 +30,16 @@ export default Plugin.define({
   },
 })
 
+
+
+function extractAgentName(s: any): string {
+  if (s.agent && s.agent !== "subagent" && s.agent !== "unknown") return s.agent
+  const title = s.title ?? ""
+  const idx = title.indexOf(": ")
+  if (idx > 0) return title.slice(0, idx).trim()
+  return s.agent ?? "unknown"
+}
+
 function CrewBeeActivityPanel(props: { context: Plugin.Context }) {
   const running = createMemo(() =>
     props.context.data
@@ -60,7 +70,7 @@ function CrewBeeActivityPanel(props: { context: Plugin.Context }) {
       <For each={running()}>
         {(session) => (
           <box flexDirection="column" paddingLeft={1}>
-            <text>{"• " + (session.agent ?? "unknown") + " — " + (session.title ?? session.id)}</text>
+            <text>{"• " + (extractAgentName(session) + " — " + (session.title ?? session.id))}</text>
             <text attributes={TextAttributes.DIM}>{lastText(session.id)}</text>
           </box>
         )}

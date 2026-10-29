@@ -31,7 +31,7 @@ export interface CrewBeeV2SessionMessage {
 export interface CrewBeeV2SessionClient {
   session: {
     abort(input: { path: { id: string } }): Promise<unknown>;
-    create(input: { body: { parentID: string; title: string } }): Promise<unknown>;
+    create(input: { body: { parentID: string; title: string; agent?: string } }): Promise<unknown>;
     get(input: { path: { id: string } }): Promise<unknown>;
     messages(input: { path: { id: string } }): Promise<unknown>;
     prompt(input: CrewBeeV2PromptInput): Promise<unknown>;
@@ -193,6 +193,7 @@ export function createV2SessionClient(
         return await ctx.session.create({
           parentID: input.body.parentID,
           title: input.body.title,
+          ...(input.body.agent ? { agent: input.body.agent } : {}),
         });
       },
       async get(input) {

@@ -149,14 +149,14 @@ test("CrewBee projects CodingTeam executor edit/write permissions as allow by de
 });
 
 test("CrewBee reads OpenCode configured provider models before projecting agent models", async () => {
-  const plugin = await OpenCodeCrewBeePlugin(createPluginInput({ availableModels: ["openai/gpt-5.4-mini"] }));
+  const plugin = await OpenCodeCrewBeePlugin(createPluginInput({ availableModels: ["opencode/beam-free"] }));
   const config = { agent: {} };
 
   await plugin.config?.(config);
 
-  assert.equal(config.agent["coding-codebase-explorer"].model, "openai/gpt-5.4-mini");
-  assert.equal(config.agent["coding-reviewer"].model, undefined);
-  assert.equal(config.agent["coding-multimodal-looker"].model, undefined);
+  assert.equal(config.agent["coding-codebase-explorer"].model, "opencode/beam-free");
+  assert.equal(config.agent["coding-reviewer"].model, "opencode/beam-free");
+  assert.equal(config.agent["coding-multimodal-looker"].model, "opencode/beam-free");
 });
 
 test("CrewBee calls OpenCode provider registry with SDK receiver binding", async () => {
@@ -165,9 +165,9 @@ test("CrewBee calls OpenCode provider registry with SDK receiver binding", async
     providerPayload: {
       providers: [
         {
-          id: "openai",
+          id: "opencode",
           models: {
-            "gpt-5.4-mini": { id: "gpt-5.4-mini", name: "gpt-5.4-mini" },
+            "beam-free": { id: "beam-free", name: "beam-free" },
           },
         },
       ],
@@ -185,7 +185,7 @@ test("CrewBee calls OpenCode provider registry with SDK receiver binding", async
   await plugin.config?.(config);
 
   assert.equal(calledWithConfigReceiver, true);
-  assert.equal(config.agent["coding-codebase-explorer"].model, "openai/gpt-5.4-mini");
+  assert.equal(config.agent["coding-codebase-explorer"].model, "opencode/beam-free");
 });
 
 test("CrewBee exposes task as the CrewBee delegation tool with Team-scoped targets", async () => {

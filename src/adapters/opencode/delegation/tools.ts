@@ -35,7 +35,7 @@ function createToolDefinition<Args extends z.ZodRawShape>(input: CrewBeeToolDefi
 interface ClientLike {
   session: {
     abort(input: { path: { id: string } }): Promise<unknown>;
-    create(input: { body: { parentID: string; title: string } }): Promise<unknown>;
+    create(input: { body: { parentID: string; title: string; agent?: string } }): Promise<unknown>;
     get(input: { path: { id: string } }): Promise<unknown>;
     messages(input: { path: { id: string } }): Promise<unknown>;
     prompt(input: { path: { id: string }; body: { agent?: string; model?: { providerID: string; modelID: string }; noReply?: boolean; parts: Array<{ type: "text"; text: string }> } }): Promise<unknown>;
@@ -61,7 +61,7 @@ async function createChildSession(input: {
   configKey: string;
 }): Promise<{ sessionID: string; existing: false }> {
   const created = unwrapSdkResponse(await input.client.session.create({
-    body: { parentID: input.parentSessionID, title: input.title },
+    body: { parentID: input.parentSessionID, title: input.title, agent: input.configKey },
   }));
   const sessionID = (created as { id: string }).id;
   input.store.putSession({

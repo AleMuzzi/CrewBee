@@ -65,6 +65,34 @@ export default Plugin.define({
   },
 })
 
+function extractAgentName(s: any): string {
+  if (s.agent && s.agent !== "subagent" && s.agent !== "unknown") return s.agent
+  const title = s.title ?? ""
+  const idx = title.indexOf(": ")
+  if (idx > 0) return title.slice(0, idx).trim()
+  return s.agent ?? "?"
+}
+
+function Section(props: { title: string; children: any }) {
+  const [open, setOpen] = createSignal(true)
+  return (
+    <div style={{ display: "flex", "flex-direction": "column", gap: "4px" }}>
+      <div
+        style={{ cursor: "pointer", "font-weight": "bold", display: "flex", "align-items": "center", gap: "4px", "user-select": "none" }}
+        onClick={() => setOpen(!open())}
+      >
+        <span style={{ "font-size": "10px", width: "12px" }}>{open() ? "▼" : "▶"}</span>
+        <span>{props.title}</span>
+      </div>
+      <Show when={open()}>
+        <div style={{ "padding-left": "16px", display: "flex", "flex-direction": "column", gap: "4px" }}>
+          {props.children}
+        </div>
+      </Show>
+    </div>
+  )
+}
+
 function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
   const background = () => props.session.background ?? []
 
@@ -109,34 +137,12 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
     }
   })
 
-  const [sessionInfo, setSessionInfo] = createResource(async () => {
-    try {
-      const res = await props.ctx.client.session.get({ path: { id: props.session.id } })
-      return res?.data ?? res ?? null
-    } catch (e) {
-      return null
-    }
-  })
-
-  const currentModelId = () => {
-    const m = sessionInfo()?.model
-    return m?.id ?? ""
-  }
-
-  const onSessionModelChange = async (modelId: string) => {
-    const m = (models() ?? []).find((x: any) => (x.id ?? x.modelID) === modelId)
-    if (!m) return
-    try {
-      await props.ctx.client.session.switchModel({
-        path: { id: props.session.id },
-        body: { model: { providerID: m.providerID, id: m.id ?? m.modelID } },
-      })
-      const res = await props.ctx.client.session.get({ path: { id: props.session.id } })
-      setSessionInfo(res?.data ?? res ?? null)
-    } catch (e) {
-      // ignore
-    }
-  }
+  const crewbeeSessions = createMemo(() =>
+    (sessions() ?? []).filter((s: any) => {
+      const name = extractAgentName(s)
+      return name.startsWith("coding-") || name.startsWith("crewbee")
+    })
+  )
 
   const onAgentModelChange = async (agentId: string, modelId: string) => {
     if (!modelId) return
@@ -166,88 +172,80 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
     return dm ? (dm.id ?? dm.modelID ?? "?") : "default"
   }
 
+  const lastMessage = (s: any) => {
+    // session list doesn't include messages; show title
+    return s.title ?? s.id
+  }
+
   return (
     <div style={{ padding: "8px", display: "flex", "flex-direction": "column", gap: "8px", "max-height": "100%", "overflow-y": "auto" }}>
       <h3>{"CrewBee — agenti al lavoro"}</h3>
 
-      <Show when={background().length === 0}>
-        <p style={{ opacity: 0.6 }}>Nessun agente in background per questa sessione.</p>
-      </Show>
-
-      <For each={background()}>
-        {(task: any) => (
-          <div style={{ "padding-left": "8px", display: "flex", "flex-direction": "column", gap: "2px" }}>
-            <strong>{task.type === "subagent" ? (task.agent ?? "subagent") : "shell"}</strong>
-            <span style={{ "font-size": "12px", opacity: 0.7 }}>{task.label}</span>
-          </div>
-        )}
-      </For>
-
-      <hr style={{ opacity: 0.3 }} />
-
-      <h4>{"Agenti CrewBee (" + (agents()?.length ?? 0) + ")"}</h4>
-      <p style={{ "font-size": "11px", opacity: 0.6, margin: 0 }}>
-        {"Modello effettivo: " + ((agents()?.length ?? 0) > 0
-          ? "host default (" + dmLabel() + ") se non configurato, altrimenti quello in crewbee.json"
-          : "nessun agente")}
-      </p>
-      <For each={agents() ?? []}>
-        {(a: any) => (
-          <div style={{ "padding-left": "8px", display: "flex", "flex-direction": "column", gap: "4px", "margin-bottom": "8px" }}>
-            <strong>{a.id ?? a.name}</strong>
-            <span style={{ "font-size": "12px", opacity: 0.7 }}>
-              {"model: " + agentModelLabel(a)}
-            </span>
-            <select
-              style={{ "font-size": "11px", "max-width": "100%" }}
-              onChange={(e) => onAgentModelChange(a.id ?? a.name, e.currentTarget.value)}
-            >
-              <option value="">{agentModelLabel(a) + " (attuale)"}</option>
-              <For each={models() ?? []}>
-                {(m: any) => (
-                  <option value={m.id ?? m.modelID}>
-                    {(m.providerID ?? "") + "/" + (m.id ?? m.modelID)}
-                  </option>
-                )}
-              </For>
-            </select>
-          </div>
-        )}
-      </For>
-
-      <hr style={{ opacity: 0.3 }} />
-
-      <h4>{"Modello sessione corrente"}</h4>
-      <div style={{ "font-size": "12px", opacity: 0.7, "margin-bottom": "4px" }}>
-        {"In uso: " + (currentModelId() || "host default (" + dmLabel() + ")")}
-      </div>
-      <select
-        value={currentModelId()}
-        onChange={(e) => onSessionModelChange(e.currentTarget.value)}
-        style={{ "font-size": "12px" }}
-      >
-        <Show when={currentModelId() && !(models() ?? []).some((m: any) => (m.id ?? m.modelID) === currentModelId())}>
-          <option value={currentModelId()}>{currentModelId()}</option>
+      <Section title={"Task in background (" + background().length + ")"}>
+        <Show when={background().length === 0}>
+          <p style={{ opacity: 0.6, margin: 0 }}>Nessun agente in background per questa sessione.</p>
         </Show>
-        <For each={models() ?? []}>
-          {(m: any) => (
-            <option value={m.id ?? m.modelID}>
-              {(m.providerID ?? "") + "/" + (m.id ?? m.modelID)}
-            </option>
+        <For each={background()}>
+          {(task: any) => (
+            <div style={{ display: "flex", "flex-direction": "column", gap: "2px" }}>
+              <strong>{task.type === "subagent" ? (task.agent ?? "subagent") : "shell"}</strong>
+              <span style={{ "font-size": "12px", opacity: 0.7 }}>{task.label}</span>
+            </div>
           )}
         </For>
-      </select>
+      </Section>
 
-      <hr style={{ opacity: 0.3 }} />
+      <Section title={"Agenti CrewBee (" + (agents()?.length ?? 0) + ")"}>
+        <p style={{ "font-size": "11px", opacity: 0.6, margin: 0 }}>
+          {"Modello effettivo: host default (" + dmLabel() + ") se non configurato, altrimenti quello in crewbee.json"}
+        </p>
+        <For each={agents() ?? []}>
+          {(a: any) => (
+            <div style={{ display: "flex", "flex-direction": "column", gap: "4px", "margin-bottom": "8px" }}>
+              <strong>{a.id ?? a.name}</strong>
+              <span style={{ "font-size": "12px", opacity: 0.7 }}>
+                {"model: " + agentModelLabel(a)}
+              </span>
+              <select
+                style={{ "font-size": "11px", "max-width": "100%" }}
+                onChange={(e) => onAgentModelChange(a.id ?? a.name, e.currentTarget.value)}
+              >
+                <option value="">{agentModelLabel(a) + " (attuale)"}</option>
+                <For each={models() ?? []}>
+                  {(m: any) => (
+                    <option value={m.id ?? m.modelID}>
+                      {(m.providerID ?? "") + "/" + (m.id ?? m.modelID)}
+                    </option>
+                  )}
+                </For>
+              </select>
+            </div>
+          )}
+        </For>
+      </Section>
 
-      <h4>{"Sessioni aperte (" + (sessions()?.length ?? 0) + ")"}</h4>
-      <For each={sessions() ?? []}>
-        {(s: any) => (
-          <div style={{ "padding-left": "8px", "font-size": "12px" }}>
-            {"• " + (s.agent ?? "?") + " — " + (s.title ?? s.id)}
-          </div>
-        )}
-      </For>
+      <Section title={"Sessioni CrewBee (" + crewbeeSessions().length + ")"}>
+        <Show when={crewbeeSessions().length === 0}>
+          <p style={{ opacity: 0.6, margin: 0, "font-size": "12px" }}>Nessuna sessione CrewBee attiva.</p>
+        </Show>
+        <For each={crewbeeSessions()}>
+          {(s: any) => (
+            <div style={{ "font-size": "12px", "margin-bottom": "4px" }}>
+              {"• " + extractAgentName(s) + " — " + (s.title ?? s.id)}
+            </div>
+          )}
+        </For>
+      </Section>
+
+      <Section title={"Tutte le sessioni (" + (sessions()?.length ?? 0) + ")"}>
+        <For each={sessions() ?? []}>
+          {(s: any) => (
+            <div style={{ "font-size": "12px", "margin-bottom": "2px" }}>
+              {"• " + extractAgentName(s) + " — " + (s.title ?? s.id)}
+            </div>
+          )}
+        </For>
+      </Section>
 
       <p style={{ "font-size": "11px", opacity: 0.5 }}>
         Cambiare il modello per agente aggiorna opencode.json (agent.&lt;id&gt;.model). Riavvia OpenCode per applicare.
