@@ -1,5 +1,5 @@
 import { Plugin } from "@opencode/plugin/gui"
-import { For, Show, createMemo, createResource } from "solid-js"
+import { For, Show, createMemo, createResource, createSignal } from "solid-js"
 import { Command, Panel } from "@opencode/plugin/gui"
 import { Schema } from "effect"
 import { Ipc } from "@opencode/plugin/gui"
