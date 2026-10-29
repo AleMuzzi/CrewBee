@@ -73,8 +73,13 @@ function extractAgentName(s: any): string {
   return s.agent ?? "?"
 }
 
-function Section(props: { title: string; children: any }) {
-  const [open, setOpen] = createSignal(true)
+function isActive(s: any): boolean {
+  // A session is active if it has no outcome (not completed) 
+  return !s.outcome
+}
+
+function Section(props: { title: string; children: any; defaultOpen?: boolean }) {
+  const [open, setOpen] = createSignal(props.defaultOpen ?? true)
   return (
     <div style={{ display: "flex", "flex-direction": "column", gap: "4px" }}>
       <div
@@ -108,7 +113,7 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
     }
   })
 
-  const [sessions] = createResource(async () => {
+  const [sessions, { refetch: refetchSessions }] = createResource(async () => {
     try {
       const res = await props.ctx.client.session.list()
       const list = res?.data ?? res ?? []
@@ -137,8 +142,12 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
     }
   })
 
+  const activeSessions = createMemo(() =>
+    (sessions() ?? []).filter((s: any) => isActive(s))
+  )
+
   const crewbeeSessions = createMemo(() =>
-    (sessions() ?? []).filter((s: any) => {
+    activeSessions().filter((s: any) => {
       const name = extractAgentName(s)
       return name.startsWith("coding-") || name.startsWith("crewbee")
     })
@@ -170,11 +179,6 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
   const dmLabel = () => {
     const dm = defaultModel()
     return dm ? (dm.id ?? dm.modelID ?? "?") : "default"
-  }
-
-  const lastMessage = (s: any) => {
-    // session list doesn't include messages; show title
-    return s.title ?? s.id
   }
 
   return (
@@ -224,7 +228,7 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
         </For>
       </Section>
 
-      <Section title={"Sessioni CrewBee (" + crewbeeSessions().length + ")"}>
+      <Section title={"Sessioni CrewBee attive (" + crewbeeSessions().length + ")"}>
         <Show when={crewbeeSessions().length === 0}>
           <p style={{ opacity: 0.6, margin: 0, "font-size": "12px" }}>Nessuna sessione CrewBee attiva.</p>
         </Show>
@@ -237,8 +241,8 @@ function CrewBeeActivityPanel(props: { ctx: any; session: any }) {
         </For>
       </Section>
 
-      <Section title={"Tutte le sessioni (" + (sessions()?.length ?? 0) + ")"}>
-        <For each={sessions() ?? []}>
+      <Section title={"Tutte le sessioni attive (" + activeSessions().length + ")"} defaultOpen={false}>
+        <For each={activeSessions()}>
           {(s: any) => (
             <div style={{ "font-size": "12px", "margin-bottom": "2px" }}>
               {"• " + extractAgentName(s) + " — " + (s.title ?? s.id)}
